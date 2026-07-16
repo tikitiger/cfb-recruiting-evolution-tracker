@@ -27,7 +27,49 @@ model Season {
   importedAt DateTime @default(now())
   sourceFile String?
 
-  stats TeamSeasonStat[]
+  stats    TeamSeasonStat[]
+  settings SeasonSettings?
+}
+
+model SeasonSettings {
+  id       String @id @default(cuid())
+  season   Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  seasonId String @unique
+
+  cpuTransferChance  Int?
+  userTransferChance Int?
+  maxTransfersPerTeam Int?
+  recruitFlipping    Boolean?
+  skillLevel         String?
+  progressionFreq    String?
+  talentProgressSpeed String?
+  xpPenalty          Int?
+
+  xpQB  Int?
+  xpHB  Int?
+  xpWR  Int?
+  xpTE  Int?
+  xpT   Int?
+  xpG   Int?
+  xpC   Int?
+  xpDE  Int?
+  xpDT  Int?
+  xpOLB Int?
+  xpMLB Int?
+  xpCB  Int?
+  xpFS  Int?
+  xpSS  Int?
+  xpK   Int?
+  xpP   Int?
+
+  unsignedTotal    Int?
+  unsignedFiveStar Int?
+  unsignedFourStar Int?
+  unsignedThreeStar Int?
+  unsignedTwoStar  Int?
+  unsignedOneStar  Int?
+  unsignedHS       Int?
+  unsignedTransfer Int?
 }
 
 model TeamSeasonStat {
@@ -61,6 +103,13 @@ model TeamSeasonStat {
 
   hsRecruits       Int?
   transferRecruits Int?
+
+  gradeAtmosphere  String?
+  gradeBrand       String?
+  gradeBudget      String?
+  gradeTraditions  String?
+  gradeConference  String?
+  avgGrade         Float?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

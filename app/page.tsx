@@ -4,6 +4,21 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 type Season = { id: string; year: number; label: string };
+type Settings = {
+  cpuTransferChance: number | null;
+  userTransferChance: number | null;
+  maxTransfersPerTeam: number | null;
+  recruitFlipping: boolean | null;
+  skillLevel: string | null;
+  progressionFreq: string | null;
+  talentProgressSpeed: string | null;
+  xpPenalty: number | null;
+  xpQB: number | null; xpHB: number | null; xpWR: number | null; xpTE: number | null;
+  xpT: number | null; xpG: number | null; xpC: number | null;
+  xpDE: number | null; xpDT: number | null; xpOLB: number | null; xpMLB: number | null;
+  xpCB: number | null; xpFS: number | null; xpSS: number | null;
+  xpK: number | null; xpP: number | null;
+} | null;
 type TeamStat = {
   id: string;
   overall: number | null;
@@ -24,6 +39,12 @@ type TeamStat = {
   hsRecruits: number | null;
   transferRecruits: number | null;
   rosterSize: number | null;
+  gradeAtmosphere: string | null;
+  gradeBrand: string | null;
+  gradeBudget: string | null;
+  gradeTraditions: string | null;
+  gradeConference: string | null;
+  avgGrade: number | null;
   team: {
     id: string;
     name: string;
@@ -35,17 +56,19 @@ type TeamStat = {
 
 type SortKey =
   | 'name' | 'conference' | 'overall' | 'prestige' | 'recruitingRank'
-  | 'record' | 'transfersIn' | 'transfersOut' | 'recruitCount'
+  | 'record' | 'transfersIn' | 'transfersOut' | 'netTransfers' | 'recruitCount'
   | 'fiveStars' | 'fourStars' | 'threeStars' | 'twoStars' | 'oneStars'
-  | 'netTransfers';
+  | 'avgGrade';
 
 export default function Dashboard() {
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [seasonId, setSeasonId] = useState('');
   const [stats, setStats] = useState<TeamStat[]>([]);
+  const [settings, setSettings] = useState<Settings>(null);
   const [loading, setLoading] = useState(true);
   const [conferenceFilter, setConferenceFilter] = useState('All');
   const [recruitTypeFilter, setRecruitTypeFilter] = useState<'all' | 'hs' | 'transfer'>('all');
+  const [showGrades, setShowGrades] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('overall');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -60,6 +83,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!seasonId) return;
     fetch(`/api/stats?seasonId=${seasonId}`).then((r) => r.json()).then(setStats);
+    fetch(`/api/settings?seasonId=${seasonId}`).then((r) => r.json()).then(setSettings);
   }, [seasonId]);
 
   const conferences = useMemo(() => {
@@ -83,17 +107,14 @@ export default function Dashboard() {
         case 'record': return dir * ((a.wins ?? 0) - (a.losses ?? 0) - ((b.wins ?? 0) - (b.losses ?? 0)));
         case 'transfersIn': return dir * ((a.transfersIn ?? -1) - (b.transfersIn ?? -1));
         case 'transfersOut': return dir * ((a.transfersOut ?? -1) - (b.transfersOut ?? -1));
+        case 'netTransfers': return dir * (((a.transfersIn ?? 0) - (a.transfersOut ?? 0)) - ((b.transfersIn ?? 0) - (b.transfersOut ?? 0)));
         case 'recruitCount': return dir * ((a.recruitCount ?? -1) - (b.recruitCount ?? -1));
         case 'fiveStars': return dir * ((a.fiveStars ?? -1) - (b.fiveStars ?? -1));
         case 'fourStars': return dir * ((a.fourStars ?? -1) - (b.fourStars ?? -1));
         case 'threeStars': return dir * ((a.threeStars ?? -1) - (b.threeStars ?? -1));
         case 'twoStars': return dir * ((a.twoStars ?? -1) - (b.twoStars ?? -1));
         case 'oneStars': return dir * ((a.oneStars ?? -1) - (b.oneStars ?? -1));
-        case 'netTransfers': {
-          const an = (a.transfersIn ?? 0) - (a.transfersOut ?? 0);
-          const bn = (b.transfersIn ?? 0) - (b.transfersOut ?? 0);
-          return dir * (an - bn);
-        }
+        case 'avgGrade': return dir * ((a.avgGrade ?? -1) - (b.avgGrade ?? -1));
         default: return 0;
       }
     });
@@ -125,8 +146,53 @@ export default function Dashboard() {
     );
   }
 
+  const xpPositions = [
+    ['QB', settings?.xpQB], ['HB', settings?.xpHB], ['WR', settings?.xpWR], ['TE', settings?.xpTE],
+    ['T', settings?.xpT], ['G', settings?.xpG], ['C', settings?.xpC],
+    ['DE', settings?.xpDE], ['DT', settings?.xpDT], ['OLB', settings?.xpOLB], ['MLB', settings?.xpMLB],
+    ['CB', settings?.xpCB], ['FS', settings?.xpFS], ['SS', settings?.xpSS],
+    ['K', settings?.xpK], ['P', settings?.xpP],
+  ] as const;
+
   return (
     <div className="mx-auto max-w-[1600px] px-6 py-5">
+      {/* Settings panel */}
+      {settings && (
+        <div
+          className="mb-4 rounded-lg border px-4 py-3"
+          style={{ background: 'var(--ocean-900)', borderColor: 'var(--ocean-800)' }}
+        >
+          <div className="mb-2 flex items-center gap-3">
+            <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--ocean-400)' }}>Dynasty Settings</h2>
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
+            <SettingPill label="Difficulty" value={settings.skillLevel?.replace('_', ' ') ?? '—'} />
+            <SettingPill label="CPU Transfer %" value={`${settings.cpuTransferChance ?? '—'}%`} />
+            <SettingPill label="User Transfer %" value={`${settings.userTransferChance ?? '—'}%`} />
+            <SettingPill label="Max Transfers/Team" value={String(settings.maxTransfersPerTeam ?? '—')} />
+            <SettingPill label="Recruit Flipping" value={settings.recruitFlipping ? 'ON' : 'OFF'} />
+            <SettingPill label="CPU Progression" value={settings.progressionFreq ?? '—'} />
+            <SettingPill label="Talent Speed" value={settings.talentProgressSpeed ?? '—'} />
+            <SettingPill label="Manual XP Penalty" value={`${settings.xpPenalty ?? '—'}%`} />
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>XP Sliders</span>
+            {xpPositions.map(([pos, val]) => (
+              <span
+                key={pos}
+                className="rounded px-1.5 py-0.5 text-xs tabular-nums"
+                style={{
+                  background: val !== 100 ? 'rgba(251,191,36,0.15)' : 'var(--ocean-800)',
+                  color: val !== 100 ? '#fbbf24' : 'var(--ocean-400)',
+                }}
+              >
+                {pos} {val ?? '—'}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Controls bar */}
       <div
         className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3"
@@ -151,6 +217,11 @@ export default function Dashboard() {
             <option value="transfer">Transfers</option>
           </Select>
         </ControlGroup>
+
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs" style={{ color: 'var(--ocean-300)' }}>
+          <input type="checkbox" checked={showGrades} onChange={() => setShowGrades(!showGrades)} className="accent-blue-500" />
+          Show Grades
+        </label>
 
         <div className="ml-auto flex items-center gap-4 text-xs" style={{ color: 'var(--ocean-400)' }}>
           <span>{rows.length} teams</span>
@@ -185,6 +256,16 @@ export default function Dashboard() {
                 <>
                   <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>HS</th>
                   <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>XFER</th>
+                </>
+              )}
+              {showGrades && (
+                <>
+                  <Th label="Avg" k="avgGrade" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Atm</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Brand</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Budget</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Trad</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Conf</th>
                 </>
               )}
             </tr>
@@ -229,6 +310,16 @@ export default function Dashboard() {
                     <td className="px-3 py-2 tabular-nums" style={{ color: 'var(--ocean-300)' }}>{r.transferRecruits ?? '—'}</td>
                   </>
                 )}
+                {showGrades && (
+                  <>
+                    <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: gradeColor(r.avgGrade) }}>{r.avgGrade?.toFixed(1) ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-200)' }}>{r.gradeAtmosphere ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-200)' }}>{r.gradeBrand ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-200)' }}>{r.gradeBudget ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-200)' }}>{r.gradeTraditions ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-200)' }}>{r.gradeConference ?? '—'}</td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
@@ -255,6 +346,23 @@ function ovrColor(ovr: number | null): string {
   if (ovr >= 80) return '#60a5fa';
   if (ovr >= 72) return '#fbbf24';
   return '#fb7185';
+}
+
+function gradeColor(avg: number | null): string {
+  if (avg == null) return 'var(--ocean-400)';
+  if (avg >= 3.7) return '#34d399';
+  if (avg >= 3.0) return '#60a5fa';
+  if (avg >= 2.0) return '#fbbf24';
+  return '#fb7185';
+}
+
+function SettingPill({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span style={{ color: 'var(--ocean-500)' }}>{label}:</span>
+      <span className="font-medium" style={{ color: 'var(--ocean-200)' }}>{value}</span>
+    </span>
+  );
 }
 
 function ControlGroup({ label, children }: { label: string; children: React.ReactNode }) {

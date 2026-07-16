@@ -81,8 +81,13 @@ const STAR_MAP: Record<string, keyof RecruitBreakdown> = {
   ONE_STAR: 'oneStars',
 };
 
+type RecruitAnalysis = {
+  byTeam: Map<number, RecruitBreakdown>;
+  unsigned: RecruitBreakdown;
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function analyzeRecruits(franchise: any): Promise<Map<number, RecruitBreakdown>> {
+async function analyzeRecruits(franchise: any): Promise<RecruitAnalysis> {
   const recruitTable = tableByName(franchise, 'Recruit');
   await recruitTable.readRecords(['Player', 'Class']);
 
@@ -101,7 +106,9 @@ async function analyzeRecruits(franchise: any): Promise<Map<number, RecruitBreak
     byTable.get(e.tableId)!.push(e);
   }
 
-  const result = new Map<number, RecruitBreakdown>();
+  const byTeam = new Map<number, RecruitBreakdown>();
+  const unsigned = emptyBreakdown();
+
   for (const [tableId, rows] of byTable) {
     const pt = franchise.getTableById(tableId);
     await pt.readRecords(['TeamIndex', 'ProspectStarRating']);
@@ -110,18 +117,82 @@ async function analyzeRecruits(franchise: any): Promise<Map<number, RecruitBreak
       if (!prec || prec.isEmpty) continue;
       let teamIndex: number;
       try { teamIndex = prec.TeamIndex; } catch { continue; }
-      if (teamIndex === 255 || teamIndex == null) continue;
-
-      if (!result.has(teamIndex)) result.set(teamIndex, emptyBreakdown());
-      const b = result.get(teamIndex)!;
-      b.total++;
-      if (entry.isTransfer) b.transfer++; else b.hs++;
 
       const starField = STAR_MAP[prec.ProspectStarRating as string];
+
+      if (teamIndex === 255 || teamIndex == null) {
+        unsigned.total++;
+        if (entry.isTransfer) unsigned.transfer++; else unsigned.hs++;
+        if (starField) (unsigned[starField] as number)++;
+        continue;
+      }
+
+      if (!byTeam.has(teamIndex)) byTeam.set(teamIndex, emptyBreakdown());
+      const b = byTeam.get(teamIndex)!;
+      b.total++;
+      if (entry.isTransfer) b.transfer++; else b.hs++;
       if (starField) (b[starField] as number)++;
     }
   }
-  return result;
+  return { byTeam, unsigned };
+}
+
+const GRADE_VALUES: Record<string, number> = {
+  Aplus: 4.3, A: 4.0, Aminus: 3.7,
+  Bplus: 3.3, B: 3.0, Bminus: 2.7,
+  Cplus: 2.3, C: 2.0, Cminus: 1.7,
+  Dplus: 1.3, D: 1.0, Dminus: 0.7,
+  F: 0.0,
+};
+
+function gradeToDisplay(g: string): string {
+  return g.replace('plus', '+').replace('minus', '-');
+}
+
+function avgGradeValue(...grades: string[]): number {
+  const vals = grades.map((g) => GRADE_VALUES[g]).filter((v) => v != null);
+  if (!vals.length) return 0;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function extractSettings(franchise: any) {
+  const lsTables = franchise.tables.filter((t: any) => t.name === 'LeagueSetting');
+  const ls = lsTables[0];
+  await ls.readRecords();
+  const rec = ls.records.find((r: any) => !r.isEmpty);
+
+  const xpTables = franchise.tables.filter((t: any) => t.name === 'ProgressionXPSlider');
+  const xp = xpTables[0];
+  await xp.readRecords();
+  const xpRec = xp.records.find((r: any) => !r.isEmpty);
+
+  return {
+    cpuTransferChance: rec?.CPUPlayerTransferChance ?? null,
+    userTransferChance: rec?.UserPlayerTransferChance ?? null,
+    maxTransfersPerTeam: rec?.MaxTransfersPerTeam ?? null,
+    recruitFlipping: rec?.IsRecruitFlippingEnabled ?? null,
+    skillLevel: rec?.SkillLevel ?? null,
+    progressionFreq: rec?.CPUProgressionFrequency ?? null,
+    talentProgressSpeed: rec?.TalentProgressSpeed ?? null,
+    xpPenalty: rec?.ManualProgressionXPPenalty ?? null,
+    xpQB: xpRec?.QB ?? null,
+    xpHB: xpRec?.HB ?? null,
+    xpWR: xpRec?.WR ?? null,
+    xpTE: xpRec?.TE ?? null,
+    xpT: xpRec?.T ?? null,
+    xpG: xpRec?.G ?? null,
+    xpC: xpRec?.C ?? null,
+    xpDE: xpRec?.DE ?? null,
+    xpDT: xpRec?.DT ?? null,
+    xpOLB: xpRec?.OLB ?? null,
+    xpMLB: xpRec?.MLB ?? null,
+    xpCB: xpRec?.CB ?? null,
+    xpFS: xpRec?.FS ?? null,
+    xpSS: xpRec?.SS ?? null,
+    xpK: xpRec?.K ?? null,
+    xpP: xpRec?.P ?? null,
+  };
 }
 
 export type ImportResult = {
@@ -147,15 +218,46 @@ export async function importSaveFile(savePath: string): Promise<ImportResult> {
     'TEAM_RATINGOVR', 'TeamPrestige', 'PrestigeRank', 'TopClassRank', 'TeamRank',
     'ConfWin', 'ConfLoss', 'NonConfWin', 'NonConfLoss',
     'LastSeasonTransfersSigned', 'LastSeasonTransfersLost', 'ActiveRosterSize',
+    'ProgramPointsStadiumAtmosphereGrade', 'ProgramPointsBrandExposureGrade',
+    'ProgramPointsBudgetGrade', 'ProgramPointsProgramTraditionsGrade',
+    'ProgramPointsConferencePrestigeGrade',
   ]);
 
   const confMap = await resolveConferences(franchise, teamTable);
-  const recruitData = await analyzeRecruits(franchise);
+  const { byTeam: recruitData, unsigned } = await analyzeRecruits(franchise);
+  const settings = await extractSettings(franchise);
 
   const season = await prisma.season.upsert({
     where: { year },
     update: { sourceFile: savePath },
     create: { year, label: `Season ${year}`, sourceFile: savePath },
+  });
+
+  await prisma.seasonSettings.upsert({
+    where: { seasonId: season.id },
+    update: {
+      ...settings,
+      unsignedTotal: unsigned.total,
+      unsignedFiveStar: unsigned.fiveStars,
+      unsignedFourStar: unsigned.fourStars,
+      unsignedThreeStar: unsigned.threeStars,
+      unsignedTwoStar: unsigned.twoStars,
+      unsignedOneStar: unsigned.oneStars,
+      unsignedHS: unsigned.hs,
+      unsignedTransfer: unsigned.transfer,
+    },
+    create: {
+      seasonId: season.id,
+      ...settings,
+      unsignedTotal: unsigned.total,
+      unsignedFiveStar: unsigned.fiveStars,
+      unsignedFourStar: unsigned.fourStars,
+      unsignedThreeStar: unsigned.threeStars,
+      unsignedTwoStar: unsigned.twoStars,
+      unsignedOneStar: unsigned.oneStars,
+      unsignedHS: unsigned.hs,
+      unsignedTransfer: unsigned.transfer,
+    },
   });
 
   let teamsImported = 0;
@@ -166,7 +268,7 @@ export async function importSaveFile(savePath: string): Promise<ImportResult> {
     const name: string = rec.DisplayName;
     const conf = confMap.get(name);
     if (!conf) {
-      teamsSkipped.push(name); // FCS placeholder opponents etc. — not a real program to track
+      teamsSkipped.push(name);
       continue;
     }
 
@@ -193,6 +295,12 @@ export async function importSaveFile(savePath: string): Promise<ImportResult> {
     const losses = (rec.ConfLoss ?? 0) + (rec.NonConfLoss ?? 0);
     const rb = recruitData.get(rec.TeamIndex) ?? emptyBreakdown();
 
+    const gAtm: string = rec.ProgramPointsStadiumAtmosphereGrade ?? '';
+    const gBrand: string = rec.ProgramPointsBrandExposureGrade ?? '';
+    const gBudget: string = rec.ProgramPointsBudgetGrade ?? '';
+    const gTrad: string = rec.ProgramPointsProgramTraditionsGrade ?? '';
+    const gConf: string = rec.ProgramPointsConferencePrestigeGrade ?? '';
+
     const statPayload = {
       overall: rec.TEAM_RATINGOVR ?? null,
       prestige: rec.TeamPrestige ?? null,
@@ -211,6 +319,12 @@ export async function importSaveFile(savePath: string): Promise<ImportResult> {
       oneStars: rb.oneStars,
       hsRecruits: rb.hs,
       transferRecruits: rb.transfer,
+      gradeAtmosphere: gAtm ? gradeToDisplay(gAtm) : null,
+      gradeBrand: gBrand ? gradeToDisplay(gBrand) : null,
+      gradeBudget: gBudget ? gradeToDisplay(gBudget) : null,
+      gradeTraditions: gTrad ? gradeToDisplay(gTrad) : null,
+      gradeConference: gConf ? gradeToDisplay(gConf) : null,
+      avgGrade: avgGradeValue(gAtm, gBrand, gBudget, gTrad, gConf),
     };
 
     await prisma.teamSeasonStat.upsert({
