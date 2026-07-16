@@ -36,7 +36,8 @@ type TeamStat = {
 type SortKey =
   | 'name' | 'conference' | 'overall' | 'prestige' | 'recruitingRank'
   | 'record' | 'transfersIn' | 'transfersOut' | 'recruitCount'
-  | 'fiveStars' | 'fourStars' | 'threeStars';
+  | 'fiveStars' | 'fourStars' | 'threeStars' | 'twoStars' | 'oneStars'
+  | 'netTransfers';
 
 export default function Dashboard() {
   const [seasons, setSeasons] = useState<Season[]>([]);
@@ -86,23 +87,18 @@ export default function Dashboard() {
         case 'fiveStars': return dir * ((a.fiveStars ?? -1) - (b.fiveStars ?? -1));
         case 'fourStars': return dir * ((a.fourStars ?? -1) - (b.fourStars ?? -1));
         case 'threeStars': return dir * ((a.threeStars ?? -1) - (b.threeStars ?? -1));
+        case 'twoStars': return dir * ((a.twoStars ?? -1) - (b.twoStars ?? -1));
+        case 'oneStars': return dir * ((a.oneStars ?? -1) - (b.oneStars ?? -1));
+        case 'netTransfers': {
+          const an = (a.transfersIn ?? 0) - (a.transfersOut ?? 0);
+          const bn = (b.transfersIn ?? 0) - (b.transfersOut ?? 0);
+          return dir * (an - bn);
+        }
         default: return 0;
       }
     });
     return filtered;
   }, [stats, conferenceFilter, sortKey, sortDir]);
-
-  const totals = useMemo(() => {
-    let five = 0, four = 0, three = 0, two = 0, one = 0;
-    for (const r of rows) {
-      five += r.fiveStars ?? 0;
-      four += r.fourStars ?? 0;
-      three += r.threeStars ?? 0;
-      two += r.twoStars ?? 0;
-      one += r.oneStars ?? 0;
-    }
-    return { five, four, three, two, one, total: five + four + three + two + one };
-  }, [rows]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -161,16 +157,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Star summary cards */}
-      <div className="mb-4 grid grid-cols-6 gap-2">
-        <StarCard label="5-Star" count={totals.five} color="#fbbf24" />
-        <StarCard label="4-Star" count={totals.four} color="#a78bfa" />
-        <StarCard label="3-Star" count={totals.three} color="#60a5fa" />
-        <StarCard label="2-Star" count={totals.two} color="#34d399" />
-        <StarCard label="1-Star" count={totals.one} color="#94a3b8" />
-        <StarCard label="Total" count={totals.total} color="var(--ocean-300)" />
-      </div>
-
       {/* Table */}
       <div
         className="overflow-x-auto rounded-lg border"
@@ -188,9 +174,12 @@ export default function Dashboard() {
               <Th label="Record" k="record" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="In" k="transfersIn" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="Out" k="transfersOut" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <Th label="Net" k="netTransfers" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="★5" k="fiveStars" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="★4" k="fourStars" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="★3" k="threeStars" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <Th label="★2" k="twoStars" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <Th label="★1" k="oneStars" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="Signed" k="recruitCount" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               {recruitTypeFilter !== 'all' ? null : (
                 <>
@@ -225,9 +214,14 @@ export default function Dashboard() {
                 <td className="px-3 py-2 tabular-nums" style={{ color: 'var(--ocean-200)' }}>{r.wins ?? 0}-{r.losses ?? 0}</td>
                 <td className="px-3 py-2 tabular-nums" style={{ color: '#34d399' }}>{r.transfersIn ?? '—'}</td>
                 <td className="px-3 py-2 tabular-nums" style={{ color: '#fb7185' }}>{r.transfersOut ?? '—'}</td>
+                <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: netColor((r.transfersIn ?? 0) - (r.transfersOut ?? 0)) }}>
+                  {formatNet((r.transfersIn ?? 0) - (r.transfersOut ?? 0))}
+                </td>
                 <td className="px-3 py-2 tabular-nums font-medium" style={{ color: '#fbbf24' }}>{r.fiveStars || '—'}</td>
                 <td className="px-3 py-2 tabular-nums" style={{ color: '#a78bfa' }}>{r.fourStars || '—'}</td>
                 <td className="px-3 py-2 tabular-nums" style={{ color: '#60a5fa' }}>{r.threeStars || '—'}</td>
+                <td className="px-3 py-2 tabular-nums" style={{ color: '#34d399' }}>{r.twoStars || '—'}</td>
+                <td className="px-3 py-2 tabular-nums" style={{ color: '#94a3b8' }}>{r.oneStars || '—'}</td>
                 <td className="px-3 py-2 tabular-nums font-medium" style={{ color: 'var(--ocean-200)' }}>{r.recruitCount ?? '—'}</td>
                 {recruitTypeFilter !== 'all' ? null : (
                   <>
@@ -242,6 +236,17 @@ export default function Dashboard() {
       </div>
     </div>
   );
+}
+
+function netColor(n: number): string {
+  if (n > 0) return '#34d399';
+  if (n < 0) return '#fb7185';
+  return 'var(--ocean-400)';
+}
+
+function formatNet(n: number): string {
+  if (n > 0) return `+${n}`;
+  return String(n);
 }
 
 function ovrColor(ovr: number | null): string {
@@ -275,18 +280,6 @@ function Select({ value, onChange, children }: { value: string; onChange: (v: st
     >
       {children}
     </select>
-  );
-}
-
-function StarCard({ label, count, color }: { label: string; count: number; color: string }) {
-  return (
-    <div
-      className="flex flex-col items-center rounded-lg border px-3 py-2.5"
-      style={{ background: 'var(--ocean-900)', borderColor: 'var(--ocean-800)' }}
-    >
-      <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ocean-500)' }}>{label}</span>
-      <span className="mt-0.5 text-xl font-bold tabular-nums" style={{ color }}>{count}</span>
-    </div>
   );
 }
 
