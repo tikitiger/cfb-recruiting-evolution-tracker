@@ -297,10 +297,10 @@ export default function Dashboard() {
                 <td className="px-3 py-2">
                   {r.team.logoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <div style={{ width: 40, height: 40, flexShrink: 0 }}>
+                    <div style={{ width: 28, height: 28, flexShrink: 0 }}>
                       <img src={r.team.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.35)) drop-shadow(0 0 1px rgba(255,255,255,0.5))' }} />
                     </div>
-                  ) : <div style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 4, background: 'var(--ocean-800)' }} />}
+                  ) : <div style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 4, background: 'var(--ocean-800)' }} />}
                 </td>
                 <td className="px-3 py-2 font-medium" style={{ color: 'var(--ocean-100)' }}>{r.team.name}</td>
                 <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-400)' }}>{r.team.conference}</td>
