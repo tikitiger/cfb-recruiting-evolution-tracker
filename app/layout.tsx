@@ -37,6 +37,7 @@ export default function RootLayout({
               <NavLink href="/">Dashboard</NavLink>
               <NavLink href="/charts">Charts</NavLink>
               <NavLink href="/unsigned">Unsigned</NavLink>
+              <NavLink href="/pipelines">Pipelines</NavLink>
               <NavLink href="/import">Import</NavLink>
             </nav>
           </div>

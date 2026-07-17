@@ -293,24 +293,97 @@ export async function importSaveFile(savePath: string): Promise<ImportResult> {
     'CommittedPlayers',
   ]);
 
-  // Build facilities grade map: TeamIndex → { grade, score }
-  const facilitiesMap = new Map<number, { grade: string; score: number }>();
+  // Build tracking map: TeamIndex → all MySchoolTrackingTable grade fields
+  type TrackingData = {
+    gradeFacilities: string | null; facilitiesScore: number | null;
+    gradeAcademic: string | null; gradeCampus: string | null;
+    gradeCoachStability: string | null; gradeCoachPrestige: string | null; gradeChampion: string | null;
+    gradeProQB: string | null; gradeProRB: string | null; gradeProWR: string | null; gradeProTE: string | null;
+    gradeProOL: string | null; gradeProDL: string | null; gradeProLB: string | null; gradeProDB: string | null;
+    gradeProK: string | null; gradeProP: string | null;
+  };
+  const trackingMap = new Map<number, TrackingData>();
   try {
     const trackingTables = franchise.tables.filter((t: any) => t.name === 'MySchoolTrackingTable'); // eslint-disable-line @typescript-eslint/no-explicit-any
     if (trackingTables.length > 0) {
       const trackingTable = trackingTables[0];
-      await trackingTable.readRecords(['AthleticFacilitiesGrade', 'AthleticFacilitiesScore']);
-      // Row index = TeamIndex (no separate field); score 0–2000 → store as 0–100
+      await trackingTable.readRecords([
+        'AthleticFacilitiesGrade', 'AthleticFacilitiesScore',
+        'AcademicPrestigeGrade', 'CampusLifestyleGrade',
+        'CoachStabilityGrade', 'CoachPrestigeGrade', 'ChampionshipContenderGrade',
+        'ProPotentialGradeQB', 'ProPotentialGradeRB', 'ProPotentialGradeWR', 'ProPotentialGradeTE',
+        'ProPotentialGradeOL', 'ProPotentialGradeDL', 'ProPotentialGradeLB', 'ProPotentialGradeDB',
+        'ProPotentialGradeK', 'ProPotentialGradeP',
+      ]);
       trackingTable.records.forEach((r: any, rowIdx: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         if (r.isEmpty) return;
-        const grade = r.AthleticFacilitiesGrade as string;
-        const raw = r.AthleticFacilitiesScore as number;
-        if (grade) {
-          facilitiesMap.set(rowIdx, { grade: gradeToDisplay(grade), score: Math.round((raw ?? 0) / 20) });
-        }
+        const g = (f: string) => { const v = r[f] as string; return v ? gradeToDisplay(v) : null; };
+        trackingMap.set(rowIdx, {
+          gradeFacilities: g('AthleticFacilitiesGrade'),
+          facilitiesScore: Math.round(((r.AthleticFacilitiesScore as number) ?? 0) / 20),
+          gradeAcademic: g('AcademicPrestigeGrade'),
+          gradeCampus: g('CampusLifestyleGrade'),
+          gradeCoachStability: g('CoachStabilityGrade'),
+          gradeCoachPrestige: g('CoachPrestigeGrade'),
+          gradeChampion: g('ChampionshipContenderGrade'),
+          gradeProQB: g('ProPotentialGradeQB'), gradeProRB: g('ProPotentialGradeRB'),
+          gradeProWR: g('ProPotentialGradeWR'), gradeProTE: g('ProPotentialGradeTE'),
+          gradeProOL: g('ProPotentialGradeOL'), gradeProDL: g('ProPotentialGradeDL'),
+          gradeProLB: g('ProPotentialGradeLB'), gradeProDB: g('ProPotentialGradeDB'),
+          gradeProK: g('ProPotentialGradeK'), gradeProP: g('ProPotentialGradeP'),
+        });
       });
     }
   } catch { /* table absent — skip */ }
+
+  // Build coach map: TeamIndex → { name, archetype, level }
+  type CoachData = { name: string; archetype: string | null; level: number | null };
+  const coachMap = new Map<number, CoachData>();
+  try {
+    const coachTables = franchise.tables.filter((t: any) => t.name === 'Coach' && !t.isArray); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const coachTable = coachTables.find((t: any) => t.records.length > 100) ?? coachTables[0]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (coachTable) {
+      await coachTable.readRecords(['FirstName', 'LastName', 'TeamIndex', 'Position', 'DominantArchetype', 'Level']);
+      for (const c of coachTable.records) {
+        if (c.isEmpty || c.Position !== 'HeadCoach') continue;
+        const teamIdx = c.TeamIndex as number;
+        if (teamIdx == null || teamIdx === 255) continue;
+        const arch = c.DominantArchetype as string;
+        coachMap.set(teamIdx, {
+          name: `${c.FirstName ?? ''} ${c.LastName ?? ''}`.trim(),
+          archetype: arch && arch !== 'Invalid_' ? arch : null,
+          level: (c.Level as number) ?? null,
+        });
+      }
+    }
+  } catch { /* coach table absent — skip */ }
+
+  // Build pipeline map: TeamIndex → array of { pipeline, level, value }
+  type PipelineEntry = { pipeline: string; level: string; value: number };
+  const pipelineMap = new Map<number, PipelineEntry[]>();
+  try {
+    const pipelineArrTable = franchise.tables.find((t: any) => t.name === 'SchoolPipelineInfluence[]'); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const pipelineTable = franchise.tables.find((t: any) => t.name === 'SchoolPipelineInfluence'); // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (pipelineArrTable && pipelineTable) {
+      await pipelineArrTable.readRecords();
+      await pipelineTable.readRecords(['Pipeline', 'InfluenceLevel', 'InfluenceValue']);
+      pipelineArrTable.records.forEach((arrRec: any, teamIdx: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        if (arrRec.isEmpty) return;
+        const entries: PipelineEntry[] = [];
+        for (const f of Object.keys(arrRec.fields)) {
+          if (!f.startsWith('SchoolPipelineInfluence')) continue;
+          const ref = parseRef(arrRec[f]);
+          if (!ref) continue;
+          const pRec = pipelineTable.records[ref.row];
+          if (!pRec || pRec.isEmpty) continue;
+          const lvl = pRec.InfluenceLevel as string;
+          if (lvl === 'Unrecognized') continue; // skip zero-value
+          entries.push({ pipeline: pRec.Pipeline as string, level: lvl, value: pRec.InfluenceValue as number });
+        }
+        if (entries.length) pipelineMap.set(teamIdx, entries);
+      });
+    }
+  } catch { /* pipeline table absent — skip */ }
 
   const confMap = await resolveConferences(franchise, teamTable);
   const { byTeam: recruitData, unsigned, unsignedHSStars, unsignedXferStars, transfersOutByTeamIdx } = await analyzeRecruits(franchise, teamTable);
@@ -389,6 +462,9 @@ export async function importSaveFile(savePath: string): Promise<ImportResult> {
     const gBudget: string = rec.ProgramPointsBudgetGrade ?? '';
     const gTrad: string = rec.ProgramPointsProgramTraditionsGrade ?? '';
     const gConf: string = rec.ProgramPointsConferencePrestigeGrade ?? '';
+    const teamIdx = rec.TeamIndex as number;
+    const tracking = trackingMap.get(teamIdx) ?? null;
+    const coach = coachMap.get(teamIdx) ?? null;
 
     const statPayload = {
       overall: rec.TEAM_RATINGOVR ?? null,
@@ -398,7 +474,7 @@ export async function importSaveFile(savePath: string): Promise<ImportResult> {
       teamRank: rec.TeamRank ?? null,
       wins, losses,
       transfersIn: rb.transfer,
-      transfersOut: transfersOutByTeamIdx.get(rec.TeamIndex as number) ?? 0,
+      transfersOut: transfersOutByTeamIdx.get(teamIdx) ?? 0,
       recruitCount: rb.total,
       rosterSize: rec.ActiveRosterSize ?? null,
       fiveStars: rb.fiveStars,
@@ -423,9 +499,27 @@ export async function importSaveFile(savePath: string): Promise<ImportResult> {
       gradeBudget: gBudget ? gradeToDisplay(gBudget) : null,
       gradeTraditions: gTrad ? gradeToDisplay(gTrad) : null,
       gradeConference: gConf ? gradeToDisplay(gConf) : null,
-      gradeFacilities: facilitiesMap.get(rec.TeamIndex as number)?.grade ?? null,
-      facilitiesScore: facilitiesMap.get(rec.TeamIndex as number)?.score ?? null,
+      gradeFacilities: tracking?.gradeFacilities ?? null,
+      facilitiesScore: tracking?.facilitiesScore ?? null,
+      gradeAcademic: tracking?.gradeAcademic ?? null,
+      gradeCampus: tracking?.gradeCampus ?? null,
+      gradeCoachStability: tracking?.gradeCoachStability ?? null,
+      gradeCoachPrestige: tracking?.gradeCoachPrestige ?? null,
+      gradeChampion: tracking?.gradeChampion ?? null,
+      gradeProQB: tracking?.gradeProQB ?? null,
+      gradeProRB: tracking?.gradeProRB ?? null,
+      gradeProWR: tracking?.gradeProWR ?? null,
+      gradeProTE: tracking?.gradeProTE ?? null,
+      gradeProOL: tracking?.gradeProOL ?? null,
+      gradeProDL: tracking?.gradeProDL ?? null,
+      gradeProLB: tracking?.gradeProLB ?? null,
+      gradeProDB: tracking?.gradeProDB ?? null,
+      gradeProK: tracking?.gradeProK ?? null,
+      gradeProP: tracking?.gradeProP ?? null,
       avgGrade: avgGradeValue(gAtm, gBrand, gBudget, gTrad, gConf),
+      coachName: coach?.name ?? null,
+      coachArchetype: coach?.archetype ?? null,
+      coachLevel: coach?.level ?? null,
     };
 
     await prisma.teamSeasonStat.upsert({
@@ -433,6 +527,16 @@ export async function importSaveFile(savePath: string): Promise<ImportResult> {
       update: statPayload,
       create: { teamId: team.id, seasonId: season.id, ...statPayload },
     });
+
+    // Upsert pipeline records for this team/season
+    const pipelines = pipelineMap.get(teamIdx) ?? [];
+    for (const p of pipelines) {
+      await prisma.teamPipeline.upsert({
+        where: { teamId_seasonId_pipeline: { teamId: team.id, seasonId: season.id, pipeline: p.pipeline } },
+        update: { level: p.level, value: p.value },
+        create: { teamId: team.id, seasonId: season.id, pipeline: p.pipeline, level: p.level, value: p.value },
+      });
+    }
 
     teamsImported++;
   }

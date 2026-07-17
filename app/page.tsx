@@ -44,7 +44,18 @@ type TeamStat = {
   gradeConference: string | null;
   gradeFacilities: string | null;
   facilitiesScore: number | null;
+  gradeAcademic: string | null;
+  gradeCampus: string | null;
+  gradeCoachStability: string | null;
+  gradeCoachPrestige: string | null;
+  gradeChampion: string | null;
+  gradeProQB: string | null; gradeProRB: string | null; gradeProWR: string | null; gradeProTE: string | null;
+  gradeProOL: string | null; gradeProDL: string | null; gradeProLB: string | null; gradeProDB: string | null;
+  gradeProK: string | null; gradeProP: string | null;
   avgGrade: number | null;
+  coachName: string | null;
+  coachArchetype: string | null;
+  coachLevel: number | null;
   team: {
     id: string;
     name: string;
@@ -69,6 +80,8 @@ export default function Dashboard() {
   const [conferenceFilter, setConferenceFilter] = useState('All');
   const [recruitTypeFilter, setRecruitTypeFilter] = useState<'all' | 'hs' | 'transfer'>('all');
   const [showGrades, setShowGrades] = useState(false);
+  const [gradeTab, setGradeTab] = useState<'program' | 'school' | 'pro'>('program');
+  const [showCoach, setShowCoach] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('overall');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -231,8 +244,26 @@ export default function Dashboard() {
         </ControlGroup>
 
         <label className="flex cursor-pointer items-center gap-1.5 text-xs" style={{ color: 'var(--ocean-300)' }}>
-          <input type="checkbox" checked={showGrades} onChange={() => setShowGrades(!showGrades)} className="accent-blue-500" />
+          <input type="checkbox" checked={showGrades} onChange={() => { setShowGrades(!showGrades); if (showCoach) setShowCoach(false); }} className="accent-blue-500" />
           Show Grades
+        </label>
+        {showGrades && (
+          <div style={{ display: 'flex', gap: 0, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--ocean-700)' }}>
+            {(['program', 'school', 'pro'] as const).map(t => (
+              <button key={t} onClick={() => setGradeTab(t)} style={{
+                padding: '3px 10px', fontSize: '0.7rem', fontWeight: 600,
+                background: gradeTab === t ? 'var(--ocean-600)' : 'var(--ocean-800)',
+                color: gradeTab === t ? 'var(--ocean-100)' : 'var(--ocean-400)',
+                border: 'none', cursor: 'pointer',
+              }}>
+                {t === 'program' ? 'Program' : t === 'school' ? 'School' : 'Pro Pot.'}
+              </button>
+            ))}
+          </div>
+        )}
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs" style={{ color: 'var(--ocean-300)' }}>
+          <input type="checkbox" checked={showCoach} onChange={() => { setShowCoach(!showCoach); if (showGrades) setShowGrades(false); }} className="accent-blue-500" />
+          Show Coaches
         </label>
 
         <div className="ml-auto flex items-center gap-4 text-xs" style={{ color: 'var(--ocean-400)' }}>
@@ -276,7 +307,7 @@ export default function Dashboard() {
               <Th label="Signed" k="recruitCount" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>HS</th>
               <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>XFER</th>
-              {showGrades && (
+              {showGrades && gradeTab === 'program' && (
                 <>
                   <Th label="Avg" k="avgGrade" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
                   <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Atm</th>
@@ -285,6 +316,36 @@ export default function Dashboard() {
                   <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Trad</th>
                   <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Conf</th>
                   <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Facilities</th>
+                </>
+              )}
+              {showGrades && gradeTab === 'school' && (
+                <>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Academic</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Campus</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Champ</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Coach Stab</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Coach Pres</th>
+                </>
+              )}
+              {showGrades && gradeTab === 'pro' && (
+                <>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>QB</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>RB</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>WR</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>TE</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>OL</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>DL</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>LB</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>DB</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>K</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>P</th>
+                </>
+              )}
+              {showCoach && (
+                <>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Head Coach</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Archetype</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold uppercase" style={{ color: 'var(--ocean-500)' }}>Level</th>
                 </>
               )}
             </tr>
@@ -337,7 +398,7 @@ export default function Dashboard() {
                 </td>
                 <td className="px-3 py-2 tabular-nums" style={{ color: 'var(--ocean-300)' }}>{r.hsRecruits ?? '—'}</td>
                 <td className="px-3 py-2 tabular-nums" style={{ color: 'var(--ocean-300)' }}>{r.transferRecruits ?? '—'}</td>
-                {showGrades && (
+                {showGrades && gradeTab === 'program' && (
                   <>
                     <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: gradeColor(r.avgGrade) }}>{r.avgGrade?.toFixed(1) ?? '—'}</td>
                     <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-200)' }}>{r.gradeAtmosphere ?? '—'}</td>
@@ -348,6 +409,32 @@ export default function Dashboard() {
                     <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-200)' }}>
                       {r.gradeFacilities ?? '—'}{r.facilitiesScore != null ? ` (${r.facilitiesScore})` : ''}
                     </td>
+                  </>
+                )}
+                {showGrades && gradeTab === 'school' && (
+                  <>
+                    <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-200)' }}>{r.gradeAcademic ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-200)' }}>{r.gradeCampus ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-200)' }}>{r.gradeChampion ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-200)' }}>{r.gradeCoachStability ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-200)' }}>{r.gradeCoachPrestige ?? '—'}</td>
+                  </>
+                )}
+                {showGrades && gradeTab === 'pro' && (
+                  <>
+                    {([
+                      r.gradeProQB, r.gradeProRB, r.gradeProWR, r.gradeProTE, r.gradeProOL,
+                      r.gradeProDL, r.gradeProLB, r.gradeProDB, r.gradeProK, r.gradeProP,
+                    ] as (string | null)[]).map((g, gi) => (
+                      <td key={gi} className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-200)' }}>{g ?? '—'}</td>
+                    ))}
+                  </>
+                )}
+                {showCoach && (
+                  <>
+                    <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-100)' }}>{r.coachName ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs" style={{ color: 'var(--ocean-300)' }}>{r.coachArchetype ?? '—'}</td>
+                    <td className="px-3 py-2 tabular-nums text-xs font-semibold" style={{ color: 'var(--ocean-200)' }}>{r.coachLevel ?? '—'}</td>
                   </>
                 )}
               </tr>
