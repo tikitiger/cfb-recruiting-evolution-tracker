@@ -8,9 +8,9 @@ const crypto = require('crypto');
 
 const isDev = !app.isPackaged;
 const PORT = 3001; // avoid colliding with any existing localhost:3000
-const APP_DIR = isDev
-  ? path.join(__dirname, '..')
-  : path.join(process.resourcesPath, 'app');
+// In both dev and prod, __dirname is the electron/ folder inside the app root.
+// In prod the app root lives inside app.asar; Electron's fs patching makes it readable.
+const APP_DIR = path.join(__dirname, '..');
 const MIGRATIONS_DIR = isDev
   ? path.join(__dirname, '..', 'prisma', 'migrations')
   : path.join(process.resourcesPath, 'migrations');
