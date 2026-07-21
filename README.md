@@ -27,12 +27,9 @@ Built for dynasty nerds who want more than what the game shows you.
 
 ## Download
 
-Grab the latest release from the [Releases page](https://github.com/ghostcitydev/ghostcity-recruiting-tracker/releases).
+Grab the latest **Ghost City RLT Portable.exe** from the [Releases page](https://github.com/ghostcitydev/ghostcity-recruiting-tracker/releases). No installer — just download it and double-click. Put it anywhere you like (Desktop, a folder, wherever).
 
-- **Ghost City RLT Portable.exe** — run anywhere, no install needed
-- **Ghost City RLT Setup.exe** — installs with Start Menu / desktop shortcuts
-
-Your data is stored in `%AppData%\Ghost City RLT\cfb27.db`. It survives app updates and uninstalls — back it up if you want to preserve your history.
+Your data is stored in `%AppData%\ghost-city-rlt\cfb27.db`. It survives app updates — moving or deleting the exe won't touch your data. Back that file up if you want to preserve your history long-term.
 
 ---
 
@@ -93,7 +90,13 @@ cd ghostcity-recruiting-tracker
 setup.bat
 ```
 
-Requires Node.js 18+.
+Requires Node.js 18+. `setup.bat` installs dependencies, creates the local SQLite database, and opens the app at `http://localhost:3000`. After that, use `start.bat` to launch it again.
+
+**Working on the Electron app itself?**
+
+- `npm run dev` — plain Next.js dev server at `http://localhost:3000`, open in any browser. Fastest loop for UI/API work.
+- `npm run electron:dev` — opens the real Electron desktop window pointed at a live dev server. Use this when testing anything Electron-specific (window behavior, native dialogs, packaging-sensitive code paths). Hot reload works.
+- `npm run dist` — builds the production portable exe (`.next/standalone` output + electron-builder). Only needed when cutting an actual release; not required for day-to-day development.
 
 ---
 
