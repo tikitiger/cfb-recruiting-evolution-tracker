@@ -1,6 +1,6 @@
 # Ghost City RLT
 
-**Ghost City's Recruiting Landscape Tracker** — a local desktop app for tracking recruiting classes, transfer portal activity, program grades, and team ratings across every season of your **EA Sports College Football 27** dynasty.
+**Ghost City's Recruiting Landscape Tracker** — a local desktop app for tracking recruiting classes, transfer portal activity, program grades, and team ratings across every season of your **EA Sports College Football 27** dynasty. Also includes a Toolbox for bulk-editing your save file (school grades, prestige, rosters, NIL, and history resets).
 
 Built for dynasty nerds who want more than what the game shows you.
 
@@ -8,20 +8,28 @@ Built for dynasty nerds who want more than what the game shows you.
 
 ## Features
 
-- **Dashboard** — sortable table of all 134 teams with OVR, prestige, recruiting rank, star breakdowns, transfer in/out/net, and program grades
+### Tracking (read-only — your save file is never touched)
+
+- **Dashboard** — sortable table of every FBS team with OVR, prestige, recruiting rank, star breakdowns, transfer in/out/net, and program grades
 - **Star filter** — toggle between All / High School+JUCO / Transfer Portal; star columns update accordingly
 - **Grades panel** — toggle to show Atmosphere, Brand, Budget, Traditions, Conference Prestige, and Facilities grades per team
 - **Power 4 / Group of 5 filters** — quick conference group filtering above individual conferences
 - **Pipelines** — track regional recruiting influence levels and HS recruit hauls by pipeline, with year-over-year history
-- **CSV export** — export dashboard stats, unsigned recruits, pipeline influence, or HS recruits to CSV
-- **Charts** — trend lines per team, recruit composition stacked bars, plus three national charts:
-  - OVR band distribution (how many teams sit in each tier nationally)
-  - Unsigned recruits 5★/4★/3★ split by HS vs Transfer Portal
-  - Transfer portal volume nationally (in vs out per season)
+- **Charts** — trend lines per team, recruit composition stacked bars, plus three national charts (OVR band distribution, unsigned recruits by star/source, transfer portal volume)
 - **Unsigned recruits page** — tracks unsigned prospects at snapshot time, split by HS/JUCO and Transfer Portal with per-star breakdowns
-- **Toolbox** — bulk-edit school grades with fine-grained controls (fixed, tighten, preserve, or reset to game defaults per school)
+- **CSV export** — export dashboard stats, unsigned recruits, pipeline influence, or HS recruits to CSV (buttons on Dashboard, Charts, Pipelines, and Unsigned pages)
 - **Season delete** — remove any imported season from the Import page
 - **JUCO fix** — junior college recruits counted in the HS bucket, matching the game's own grouping
+
+### Toolbox — writes directly to your save file
+
+Unlike everything above, **Toolbox edits your live dynasty save file** the next time you load it in-game. There's no in-app undo — see [Save file safety](#save-file-safety-toolbox) before using it.
+
+- **Rebalance Rosters** — bulk-adjusts player attribute ratings (fixed value or tightened toward a midpoint) to blunt the snowball effect; skips free agents and unsigned recruits
+- **Zero NIL Demands** — sets NIL value to 0 for every unsigned recruit
+- **Program Setup → School Grades** — bulk-edit team grades (fixed, tighten toward a midpoint, preserve, custom per-school, or reset to the game's year-zero defaults)
+- **Program Setup → Prestige (direct)** — bulk-edit team prestige scores directly
+- **Program Setup → History** — zeroes every team's historical record (wins/losses/championships/bowls/recruiting classes/accolades) and coach career stats, and resets pro-potential grades to C+, for a clean-slate start
 
 ---
 
@@ -49,7 +57,20 @@ No Node.js. No database setup. No config files. Just run the exe.
 3. Click **Import Save** — takes about 10–20 seconds
 4. Navigate to **Dashboard** to see your data
 
-Import after each season to build up a history over time.
+Importing is read-only — the save file itself is never modified. Import after **National Signing Day** each season to capture recruit commitments, using the same autosave file each time; the tracker detects the season year automatically.
+
+---
+
+## Save file safety (Toolbox)
+
+Everything under **Toolbox** writes changes directly into your dynasty save file — the same file EA Sports College Football 27 loads. Those changes take effect the next time you load that dynasty in-game. This is different from every other page in the app, which only reads data.
+
+A few things worth knowing:
+
+- Toolbox always edits the save file tied to your **most recently imported season** (by in-game year) — not whatever save is currently selected on the Import page.
+- Every destructive Toolbox action shows an in-app confirmation before writing, but there's no in-app undo once you confirm.
+- **Back up your save file before using Toolbox**, especially the first time. Copy the file from `Documents\EA SPORTS College Football 27\saves\` somewhere safe before running Rebalance Rosters, Zero NIL Demands, or any Program Setup action.
+- Toolbox actions are best run right before the specific game phase they target (e.g. Rebalance Rosters before *Encourage Transfers*, Zero NIL Demands before recruiting opens) — see the in-app description on each card for timing.
 
 ---
 
@@ -72,11 +93,20 @@ Download the new exe from the Releases page and run it — your data carries ove
 **Data looks wrong / facilities score is blank**
 - Delete the old season from the Import page and re-import
 
+**Toolbox says "No save file path found" or "Save file not found"**
+- Import a season first — Toolbox edits the save file tied to your most recent import, so it needs at least one imported season to know which file to write to
+- If you moved or deleted the original save file since importing, Toolbox can't find it — re-import from its new location
+
 ---
 
 ## How it works
 
-The app reads your save file using the [`madden-franchise`](https://github.com/WiiExpertise/madden-franchise) library, which understands the binary Frostbite format EA uses. It extracts per-team stats, recruiting data, grades, pipeline info, and transfer portal data and stores them in a local SQLite database. Nothing leaves your machine.
+The app reads your save file using the [`madden-franchise`](https://github.com/WiiExpertise/madden-franchise) library, which understands the binary Frostbite format EA uses.
+
+- **Importing** (Import page) extracts per-team stats, recruiting data, grades, pipeline info, and transfer portal data and stores a snapshot in a local SQLite database. The save file itself is never touched.
+- **Toolbox** goes the other direction — it opens your most-recently-imported save file and writes changes back into it directly, which the game picks up next time you load that dynasty.
+
+Nothing leaves your machine either way — no network calls, no telemetry.
 
 ---
 
