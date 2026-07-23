@@ -472,8 +472,9 @@ export default function PipelinesPage() {
                 <tbody>
                   {teamRecruitRows.map((r, i) => {
                     const inf = influenceByTeamPipeline.get(`${r.team.name}|${r.pipeline}`);
+                    const ZERO_COUNTS = { fiveStars: 0, fourStars: 0, threeStars: 0, twoStars: 0, oneStars: 0, total: 0 };
                     const posRow = posGroupFilter !== 'All' ? posFilterMap.get(`${r.teamId}|${r.pipeline}`)?.get(posGroupFilter) : null;
-                    const d = posRow ?? r;
+                    const d = posGroupFilter !== 'All' ? (posRow ?? ZERO_COUNTS) : r;
                     return (
                     <tr key={r.id} style={{ background: i % 2 === 0 ? 'var(--ocean-900)' : 'var(--ocean-800)', borderBottom: '1px solid var(--ocean-700)' }}>
                       <td style={{ padding: '7px 12px', color: 'var(--ocean-100)' }}>{PIPELINE_LABELS[r.pipeline] ?? r.pipeline}</td>
@@ -579,8 +580,9 @@ export default function PipelinesPage() {
               <tbody>
                 {regionRecruitRows.map((r, i) => {
                     const inf = influenceByTeamPipeline.get(`${r.team.name}|${r.pipeline}`);
+                    const ZERO_COUNTS = { fiveStars: 0, fourStars: 0, threeStars: 0, twoStars: 0, oneStars: 0, total: 0 };
                     const posRow = posGroupFilter !== 'All' ? posFilterMap.get(`${r.teamId}|${r.pipeline}`)?.get(posGroupFilter) : null;
-                    const d = posRow ?? r;
+                    const d = posGroupFilter !== 'All' ? (posRow ?? ZERO_COUNTS) : r;
                     return (
                   <tr key={r.id} style={{ background: i % 2 === 0 ? 'var(--ocean-900)' : 'var(--ocean-800)', borderBottom: '1px solid var(--ocean-700)' }}>
                     <td style={{ padding: '7px 12px', color: 'var(--ocean-500)', fontSize: '0.75rem' }}>{i + 1}</td>
