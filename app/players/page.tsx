@@ -46,6 +46,49 @@ type RosterPlayerRow = { teamId: string; firstName: string; lastName: string; po
 const POS_GROUPS = ['QB', 'HB', 'WR', 'TE', 'OL', 'DL', 'LB', 'DB', 'K', 'P'] as const;
 type PosGroup = typeof POS_GROUPS[number];
 
+// Ideal combined roster+recruit depth ranges per position (lo, hi)
+const IDEAL_DEPTH: Record<PosGroup, [number, number]> = {
+  QB:  [3,  6],
+  HB:  [5,  9],
+  WR:  [9,  14],
+  TE:  [3,  6],
+  OL:  [12, 18],
+  DL:  [10, 16],
+  LB:  [8,  13],
+  DB:  [11, 17],
+  K:   [1,  3],
+  P:   [1,  3],
+};
+
+function calcBalanceScore(posMap: Map<PosGroup, number>): number {
+  let penalty = 0;
+  for (const pos of POS_GROUPS) {
+    const [lo, hi] = IDEAL_DEPTH[pos];
+    const count = posMap.get(pos) ?? 0;
+    const dev = Math.max(0, lo - count) + Math.max(0, count - hi);
+    penalty += Math.min(1, dev * 0.15);
+  }
+  return Math.max(0, Math.round((10 - penalty) * 10) / 10);
+}
+
+function balanceBubble(score: number): React.CSSProperties {
+  // 10 = navy (best), lower = amber (worst)
+  const idx = Math.min(HEAT_PALETTE.length - 1, Math.floor((10 - score) / 2));
+  const { rgb, text } = HEAT_PALETTE[HEAT_PALETTE.length - 1 - idx];
+  return {
+    display: 'inline-block',
+    background: `rgba(${rgb},0.14)`,
+    color: text,
+    borderRadius: 4,
+    padding: '1px 7px',
+    fontSize: '0.72rem',
+    fontWeight: 700,
+    minWidth: 22,
+    textAlign: 'center' as const,
+    fontVariantNumeric: 'tabular-nums',
+  };
+}
+
 // Each position gets a fixed color from the 6-color palette, cycling for offense → defense → ST
 const POS_COLORS: Record<PosGroup, string> = {
   QB: '#003f5c',
@@ -573,6 +616,7 @@ export default function PlayersPage() {
                     <SortTh key={pos} label={pos} sortKey={pos} active={depthSort} onSort={toggleDepthSort} />
                   ))}
                   <SortTh label="Total" sortKey="total" active={depthSort} onSort={toggleDepthSort} highlight />
+                  <th className="px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--ocean-200)' }}>Balance</th>
                 </tr>
               </thead>
               <tbody>
@@ -589,6 +633,7 @@ export default function PlayersPage() {
                   <td className="px-3 py-2 text-center tabular-nums font-bold" style={{ color: 'var(--ocean-100)' }}>
                     {POS_GROUPS.reduce((s, p) => s + depthTotals[p], 0)}
                   </td>
+                  <td />
                 </tr>
                 {depthTeams.length === 0 ? (
                   <tr>
@@ -626,6 +671,9 @@ export default function PlayersPage() {
                       })}
                       <td className="px-3 py-1.5 text-center tabular-nums font-semibold" style={{ color: 'var(--ocean-200)' }}>
                         {rowTotal || 0}
+                      </td>
+                      <td className="px-3 py-1.5 text-center">
+                        <span style={balanceBubble(calcBalanceScore(posMap))}>{calcBalanceScore(posMap).toFixed(1)}</span>
                       </td>
                     </tr>
                   );
