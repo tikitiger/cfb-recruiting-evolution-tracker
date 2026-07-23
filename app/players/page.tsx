@@ -240,10 +240,9 @@ export default function PlayersPage() {
   }, [seasonId]);
 
   const conferences = useMemo(() => {
-    if (!data) return ['All'];
-    const set = new Set(data.posRecruits.map((r) => r.team.conference));
+    const set = new Set(Array.from(allTeamMap.values()).map((t) => t.conference));
     return ['All', 'Power 4', 'Group of 5', ...Array.from(set).sort()];
-  }, [data]);
+  }, [allTeamMap]);
 
   const pipelineNames = useMemo(() => {
     const names = new Set(pipelineRows.map((r) => r.pipeline));
