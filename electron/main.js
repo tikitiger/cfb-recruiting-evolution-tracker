@@ -81,15 +81,15 @@ function runMigrations(dbPath) {
 
 // ── Next.js server ─────────────────────────────────────────────────────────────
 
-function waitForPort(port) {
+function waitForPort(port, timeoutMs = 120000) {
   return new Promise((resolve, reject) => {
-    const deadline = Date.now() + 30000;
+    const deadline = Date.now() + timeoutMs;
     const check = () => {
       const sock = net.createConnection(port, '127.0.0.1');
       sock.once('connect', () => { sock.destroy(); resolve(); });
       sock.once('error', () => {
-        if (Date.now() > deadline) return reject(new Error('Server did not start within 30s'));
-        setTimeout(check, 300);
+        if (Date.now() > deadline) return reject(new Error(`Server did not start within ${timeoutMs / 1000}s`));
+        setTimeout(check, 500);
       });
     };
     check();
@@ -120,6 +120,7 @@ async function startServer() {
 // ── Window ─────────────────────────────────────────────────────────────────────
 
 function createWindow() {
+  if (mainWindow) return;
   const iconPath = isDev
     ? path.join(__dirname, '..', 'public', 'icon.ico')
     : path.join(process.resourcesPath, 'standalone', 'public', 'icon.ico');
@@ -132,10 +133,7 @@ function createWindow() {
     title: 'Ghost City RLT',
     icon: iconPath,
     backgroundColor: '#0a1628',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
+    webPreferences: { nodeIntegration: false, contextIsolation: true },
   });
 
   mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
@@ -154,10 +152,28 @@ app.whenReady().then(async () => {
   const dbPath = path.join(app.getPath('userData'), 'cfb27.db');
   process.env.DATABASE_URL = `file:${dbPath}`;
 
+  // Show a loading window immediately so users know the app is starting
+  const iconPath = isDev
+    ? path.join(__dirname, '..', 'public', 'icon.ico')
+    : path.join(process.resourcesPath, 'standalone', 'public', 'icon.ico');
+  mainWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 960,
+    minHeight: 640,
+    title: 'Ghost City RLT',
+    icon: iconPath,
+    backgroundColor: '#0a1628',
+    webPreferences: { nodeIntegration: false, contextIsolation: true },
+  });
+  mainWindow.loadURL('data:text/html,<html style="background:%230a1628;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="color:%234a7a9b;font-family:system-ui,sans-serif;font-size:1.1rem;letter-spacing:.05em">Starting Ghost City RLT…</p></html>');
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+  mainWindow.on('closed', () => { mainWindow = null; });
+
   try {
     runMigrations(dbPath);
     await startServer();
-    createWindow();
+    mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
   } catch (err) {
     console.error(err);
     dialog.showErrorBox('Failed to start', String(err));

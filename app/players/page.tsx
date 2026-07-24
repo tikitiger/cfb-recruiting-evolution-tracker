@@ -49,17 +49,18 @@ const POS_GROUPS = ['QB', 'HB', 'WR', 'TE', 'OL', 'DL', 'LB', 'DB', 'K', 'P'] as
 type PosGroup = typeof POS_GROUPS[number];
 
 // Ideal combined roster+recruit depth ranges per position (lo, hi)
+// Midpoints from community data: QB=4, HB=5, WR=9, TE=4, OL=19, DL=13, LB=13, DB=16, K=1, P=1
 const IDEAL_DEPTH: Record<PosGroup, [number, number]> = {
   QB:  [3,  6],
-  HB:  [5,  9],
-  WR:  [9,  14],
+  HB:  [4,  7],
+  WR:  [7,  12],
   TE:  [3,  6],
-  OL:  [12, 18],
+  OL:  [15, 23],
   DL:  [10, 16],
-  LB:  [8,  13],
-  DB:  [11, 17],
-  K:   [1,  3],
-  P:   [1,  3],
+  LB:  [10, 16],
+  DB:  [13, 19],
+  K:   [1,  2],
+  P:   [1,  2],
 };
 
 function calcBalanceScore(posMap: Map<PosGroup, number>): number {
